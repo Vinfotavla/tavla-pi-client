@@ -9,7 +9,7 @@ if [ -f "$CONFIG" ]; then
   set +a
 fi
 
-VIEW_URL="${VIEW_URL:-https://status.vantrum.se/view}"
+VIEW_URL="${VIEW_URL:-https://status.vantrum.se/}"
 
 xset -dpms || true
 xset s off || true
@@ -18,10 +18,6 @@ xset s noblank || true
 unclutter -idle 0.5 -root &
 
 CHROME_BIN="$(command -v chromium || command -v chromium-browser || true)"
-if [ -z "$CHROME_BIN" ]; then
-  echo "ERROR: Chromium hittades inte."
-  exit 1
-fi
 
 exec "$CHROME_BIN" \
   --noerrdialogs \
@@ -29,6 +25,10 @@ exec "$CHROME_BIN" \
   --disable-session-crashed-bubble \
   --disable-features=TranslateUI \
   --autoplay-policy=no-user-gesture-required \
+  --start-fullscreen \
+  --window-position=0,0 \
+  --window-size=1920,1080 \
+  --force-device-scale-factor=1 \
   --kiosk \
   --incognito \
   "$VIEW_URL"
