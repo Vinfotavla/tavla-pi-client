@@ -1,17 +1,17 @@
 #!/bin/bash
 set -e
 
-echo "=== Tavla Pi Client installer ==="
-
 APP_DIR="/home/pi/tavla"
 REPO_DIR="/home/pi/tavla-pi-client"
+
+echo "=== Tavla Pi Client installer ==="
 
 sudo mkdir -p "$APP_DIR"
 sudo chown -R pi:pi "$APP_DIR"
 
 echo "Installerar paket..."
 sudo apt update
-sudo apt install -y python3 python3-requests chromium unclutter xserver-xorg xinit x11-xserver-utils
+sudo apt install -y git python3 python3-requests chromium unclutter xserver-xorg xinit x11-xserver-utils
 
 echo "Kopierar filer..."
 cp "$REPO_DIR/start_kiosk.sh" "$APP_DIR/start_kiosk.sh"
@@ -34,6 +34,7 @@ cat > /home/pi/.xinitrc <<'EOF'
 exec /home/pi/tavla/start_kiosk.sh
 EOF
 chmod +x /home/pi/.xinitrc
+sudo chown pi:pi /home/pi/.xinitrc
 
 echo "Installerar services..."
 sudo cp "$REPO_DIR/services/status-kiosk.service" /etc/systemd/system/status-kiosk.service
@@ -45,10 +46,9 @@ sudo systemctl enable status-kiosk.service
 sudo systemctl enable status-ota-client.service
 sudo systemctl enable status-command-client.service
 
-echo "Startar services..."
 sudo systemctl restart status-ota-client.service || true
 sudo systemctl restart status-command-client.service || true
 sudo systemctl restart status-kiosk.service || true
 
-echo "=== KLART ==="
-echo "Kolla admin: https://status.vantrum.se/admin/devices"
+echo "=== KLART - startar om ==="
+sudo reboot
