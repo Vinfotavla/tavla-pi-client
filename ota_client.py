@@ -1,35 +1,56 @@
-import os, time, socket, requests
+#!/usr/bin/env python3
+import time
+import subprocess
+import requests
 
-CONFIG = "/home/pi/tavla/status_kiosk.env"
-VERSION_FILE = "/home/pi/tavla/version.txt"
+ENV_FILE = "/home/pi/tavla/status_kiosk.env"
 
-def load_config():
+def load_env():
     cfg = {}
-    if os.path.exists(CONFIG):
-        for line in open(CONFIG):
-            line=line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k,v=line.split("=",1)
-                cfg[k.strip()] = v.strip()
+    with open(ENV_FILE, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                cfg[k] = v
     return cfg
 
-def version():
-    return open(VERSION_FILE).read().strip() if os.path.exists(VERSION_FILE) else "1.0.0"
+def save_env(cfg):
+    with open(ENV_FILE, "w") as f:
+        for k, v in cfg.items():
+            f.write(f"{k}={v}\n")
 
-while True:
-    try:
-        c = load_config()
-        requests.post(
-            c["SERVER_BASE_URL"].rstrip("/") + "/api/device/heartbeat",
-            json={
-                "device_id": c.get("DEVICE_ID", socket.gethostname()),
-                "token": c.get("DEVICE_TOKEN", ""),
-                "version": version(),
-                "hostname": socket.gethostname(),
-            },
-            timeout=10
-        )
-        print("heartbeat ok")
-    except Exception as e:
-        print("heartbeat error:", e)
-    time.sleep(30)
+def main():
+    while True:
+        try:
+            cfg = load_env()
+            server = cfg.get("SERVER_BASE_URL", "").rstrip("/")
+            device_id = cfg.get("DEVICE_ID")
+
+            if server and device_id:
+                r = requests.get(
+                    f"{server}/ota/check",
+                    headers={"Authorization": f"Bearer {device_id}"},
+                    timeout=15
+                )
+
+                data = r.json()
+                new_url = data.get("view_url")
+
+                if new_url and cfg.get("VIEW_URL") != new_url:
+                    print("🔄 Uppdaterar VIEW_URL:", new_url)
+                    cfg["VIEW_URL"] = new_url
+                    save_env(cfg)
+
+                    subprocess.run(
+                        ["sudo", "systemctl", "restart", "status-kiosk.service"],
+                        check=False
+                    )
+
+        except Exception as e:
+            print("OTA error:", e)
+
+        time.sleep(int(load_env().get("OTA_INTERVAL", "60")))
+
+if __name__ == "__main__":
+    main()
