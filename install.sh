@@ -1,42 +1,54 @@
 #!/bin/bash
+set -e
 
-cd /home/pi
+echo "=== Tavla Pi Client installer ==="
 
-mkdir -p tavla
-cd tavla
+APP_DIR="/home/pi/tavla"
+REPO_DIR="/home/pi/tavla-pi-client"
 
-apt update
-apt install -y python3-pip chromium-browser unclutter xserver-xorg xinit
+sudo mkdir -p "$APP_DIR"
+sudo chown -R pi:pi "$APP_DIR"
 
-pip3 install requests
+echo "Installerar paket..."
+sudo apt update
+sudo apt install -y python3 python3-requests chromium unclutter xserver-xorg xinit x11-xserver-utils
 
-cat <<EOF > status_kiosk.env
-SERVER_BASE_URL=https://status.vantrum.se
-DEVICE_ID=$(cat /sys/class/net/eth0/address | tr ':' '-')
-DEVICE_TOKEN=REPLACE_TOKEN
-VIEW_URL=https://status.vantrum.se/view
-EOF
+echo "Kopierar filer..."
+cp "$REPO_DIR/start_kiosk.sh" "$APP_DIR/start_kiosk.sh"
+cp "$REPO_DIR/ota_client.py" "$APP_DIR/ota_client.py"
+cp "$REPO_DIR/command_client.py" "$APP_DIR/command_client.py"
 
-cat <<EOF > start_kiosk.sh
+if [ ! -f "$APP_DIR/status_kiosk.env" ]; then
+  cp "$REPO_DIR/status_kiosk.env.example" "$APP_DIR/status_kiosk.env"
+fi
+
+chmod +x "$APP_DIR/start_kiosk.sh"
+
+echo "Sätter timezone..."
+sudo timedatectl set-timezone Europe/Stockholm || true
+sudo timedatectl set-ntp true || true
+
+echo "Skapar .xinitrc..."
+cat > /home/pi/.xinitrc <<'EOF'
 #!/bin/bash
-export \$(grep -v '^#' /home/pi/tavla/status_kiosk.env | xargs)
-xset -dpms
-xset s off
-xset s noblank
-unclutter &
-chromium-browser --kiosk "\$VIEW_URL"
+exec /home/pi/tavla/start_kiosk.sh
 EOF
+chmod +x /home/pi/.xinitrc
 
-chmod +x start_kiosk.sh
+echo "Installerar services..."
+sudo cp "$REPO_DIR/services/status-kiosk.service" /etc/systemd/system/status-kiosk.service
+sudo cp "$REPO_DIR/services/status-ota-client.service" /etc/systemd/system/status-ota-client.service
+sudo cp "$REPO_DIR/services/status-command-client.service" /etc/systemd/system/status-command-client.service
 
-cat <<EOF > ota_client.py
-import requests, time
-while True:
-    try:
-        requests.post("https://status.vantrum.se/api/device/heartbeat")
-    except:
-        pass
-    time.sleep(30)
-EOF
+sudo systemctl daemon-reload
+sudo systemctl enable status-kiosk.service
+sudo systemctl enable status-ota-client.service
+sudo systemctl enable status-command-client.service
 
-reboot
+echo "Startar services..."
+sudo systemctl restart status-ota-client.service || true
+sudo systemctl restart status-command-client.service || true
+sudo systemctl restart status-kiosk.service || true
+
+echo "=== KLART ==="
+echo "Kolla admin: https://status.vantrum.se/admin/devices"

@@ -1,0 +1,15 @@
+[Unit]
+Description=Tavla kiosk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/tavla
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/startx /home/pi/.xinitrc -- :0 -nocursor
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
