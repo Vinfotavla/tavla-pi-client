@@ -1,34 +1,26 @@
 #!/bin/bash
-set -e
 
-CONFIG="/home/pi/tavla/status_kiosk.env"
+export DISPLAY=:0
+export XAUTHORITY=/home/pi/.Xauthority
 
-if [ -f "$CONFIG" ]; then
-  set -a
-  . "$CONFIG"
-  set +a
-fi
-
-VIEW_URL="${VIEW_URL:-https://status.vantrum.se/}"
-
-xset -dpms || true
 xset s off || true
+xset -dpms || true
 xset s noblank || true
 
-unclutter -idle 0.5 -root &
+pkill unclutter || true
+unclutter -idle 0.2 -root &
 
-CHROME_BIN="$(command -v chromium || command -v chromium-browser || true)"
+VIEW_URL=""
+[ -f /home/pi/tavla/status_kiosk.env ] && source /home/pi/tavla/status_kiosk.env
 
-exec "$CHROME_BIN" \
-  --noerrdialogs \
-  --disable-infobars \
-  --disable-session-crashed-bubble \
-  --disable-features=TranslateUI \
-  --autoplay-policy=no-user-gesture-required \
+pkill chromium || true
+sleep 2
+
+chromium \
+  --kiosk \
   --start-fullscreen \
   --window-position=0,0 \
   --window-size=1920,1080 \
   --force-device-scale-factor=1 \
-  --kiosk \
-  --incognito \
+  --no-first-run \
   "$VIEW_URL"
