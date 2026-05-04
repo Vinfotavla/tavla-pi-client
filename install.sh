@@ -2,53 +2,93 @@
 set -e
 
 APP_DIR="/home/pi/tavla"
-REPO_DIR="/home/pi/tavla-pi-client"
+SERVER_BASE_URL="https://status.vantrum.se"
 
-echo "=== Tavla Pi Client installer ==="
+echo "Installerar VäV Pi-klient..."
 
-sudo mkdir -p "$APP_DIR"
-sudo chown -R pi:pi "$APP_DIR"
+sudo apt-get update -y
+sudo apt-get install -y chromium unclutter x11-xserver-utils cec-utils curl python3-requests
 
-echo "Installerar paket..."
-sudo apt update
-sudo apt install -y git python3 python3-requests chromium unclutter xserver-xorg xinit x11-xserver-utils
+mkdir -p "$APP_DIR"
 
-echo "Kopierar filer..."
-cp "$REPO_DIR/start_kiosk.sh" "$APP_DIR/start_kiosk.sh"
-cp "$REPO_DIR/ota_client.py" "$APP_DIR/ota_client.py"
-cp "$REPO_DIR/command_client.py" "$APP_DIR/command_client.py"
+# OTA klient
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/ota_client_pairing.py -o "$APP_DIR/ota_client.py"
 
-if [ ! -f "$APP_DIR/status_kiosk.env" ]; then
-  cp "$REPO_DIR/status_kiosk.env.example" "$APP_DIR/status_kiosk.env"
-fi
+# Kiosk script (FIXED chromium)
+cat > "$APP_DIR/start_kiosk.sh" << 'EOF'
+#!/bin/bash
+
+export DISPLAY=:0
+export XAUTHORITY=/home/pi/.Xauthority
+
+xset s off || true
+xset -dpms || true
+xset s noblank || true
+
+pkill unclutter || true
+unclutter -idle 0.2 -root &
+
+VIEW_URL=""
+[ -f /home/pi/tavla/status_kiosk.env ] && source /home/pi/tavla/status_kiosk.env
+
+pkill chromium || true
+sleep 2
+
+chromium \
+  --kiosk \
+  --start-fullscreen \
+  --window-position=0,0 \
+  --window-size=1920,1080 \
+  --force-device-scale-factor=1 \
+  --no-first-run \
+  "$VIEW_URL"
+EOF
 
 chmod +x "$APP_DIR/start_kiosk.sh"
 
-echo "Sätter timezone..."
-sudo timedatectl set-timezone Europe/Stockholm || true
-sudo timedatectl set-ntp true || true
+cat > "$APP_DIR/status_kiosk.env" << ENV
+SERVER_BASE_URL=$SERVER_BASE_URL
+OTA_INTERVAL=15
+DEVICE_ID=
+DEVICE_TOKEN=
+VIEW_URL=
+ENV
 
-echo "Skapar .xinitrc..."
-cat > /home/pi/.xinitrc <<'EOF'
-#!/bin/bash
-exec /home/pi/tavla/start_kiosk.sh
-EOF
-chmod +x /home/pi/.xinitrc
-sudo chown pi:pi /home/pi/.xinitrc
+# systemd
+sudo tee /etc/systemd/system/vav-ota-client.service > /dev/null << SERVICE
+[Unit]
+Description=VäV OTA Client
+After=network-online.target
 
-echo "Installerar services..."
-sudo cp "$REPO_DIR/services/status-kiosk.service" /etc/systemd/system/status-kiosk.service
-sudo cp "$REPO_DIR/services/status-ota-client.service" /etc/systemd/system/status-ota-client.service
-sudo cp "$REPO_DIR/services/status-command-client.service" /etc/systemd/system/status-command-client.service
+[Service]
+User=pi
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/python3 $APP_DIR/ota_client.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+sudo tee /etc/systemd/system/vav-kiosk.service > /dev/null << SERVICE
+[Unit]
+Description=VäV Kiosk
+After=graphical.target
+
+[Service]
+User=pi
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/start_kiosk.sh
+Restart=always
+
+[Install]
+WantedBy=graphical.target
+SERVICE
 
 sudo systemctl daemon-reload
-sudo systemctl enable status-kiosk.service
-sudo systemctl enable status-ota-client.service
-sudo systemctl enable status-command-client.service
+sudo systemctl enable vav-ota-client
+sudo systemctl enable vav-kiosk
+sudo systemctl restart vav-ota-client
+sudo systemctl restart vav-kiosk
 
-sudo systemctl restart status-ota-client.service || true
-sudo systemctl restart status-command-client.service || true
-sudo systemctl restart status-kiosk.service || true
-
-echo "=== KLART - startar om ==="
-sudo reboot
+echo "KLART"
