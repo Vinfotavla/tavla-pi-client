@@ -1,11 +1,19 @@
-# VäV Pi Client
+# VäV Tavla Pi Client
 
-Lägg dessa filer i GitHub-repot `Vinfotavla/tavla-pi-client`.
+## Ny installation på Pi
 
-Installera ny Pi:
+Kör en rad:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | sudo bash
 ```
 
-Alla filer är sparade med LF-radbrytningar.
+Pi:n ska visa en 6-siffrig pairing-kod.
+
+Koppla skärmen i:
+
+```text
+https://status.vantrum.se/superadmin?tab=devices
+```
+
+Alla filer ska sparas med LF-radbrytningar, inte CRLF.
