@@ -1,7 +1,11 @@
-# Tavla Pi Client
+# VäV Pi Client
 
-Installera/uppdatera på Pi:
+Lägg dessa filer i GitHub-repot `Vinfotavla/tavla-pi-client`.
+
+Installera ny Pi:
 
 ```bash
-cd /home/pi/tavla-pi-client && git pull && sudo bash install.sh
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | sudo bash
 ```
+
+Alla filer är sparade med LF-radbrytningar.
