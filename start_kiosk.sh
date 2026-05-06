@@ -3,11 +3,12 @@ set -e
 
 APP_DIR="/home/pi/tavla"
 ENV_FILE="$APP_DIR/status_kiosk.env"
+BOOT_HTML="$APP_DIR/boot.html"
+PAIRING_HTML="$APP_DIR/pairing.html"
 
 export DISPLAY=:0
 export XAUTHORITY="${XAUTHORITY:-/home/pi/.Xauthority}"
 
-# openbox ger Chromium en fungerande window manager i X-sessionen
 openbox >/dev/null 2>&1 &
 
 xset s off || true
@@ -17,13 +18,28 @@ xset s noblank || true
 pkill unclutter >/dev/null 2>&1 || true
 unclutter -idle 0.2 -root >/dev/null 2>&1 &
 
-VIEW_URL="about:blank"
+cat > "$BOOT_HTML" <<'HTML'
+<!DOCTYPE html>
+<html lang="sv"><head><meta charset="UTF-8"><style>
+html,body{margin:0;width:100%;height:100%;background:#07101f;color:white;font-family:system-ui;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.box{text-align:center;background:#111b31;border-radius:30px;padding:55px 75px;border:1px solid rgba(255,255,255,.14)}
+.logo{font-size:52px;font-weight:950;margin-bottom:18px}
+p{font-size:28px;color:#b8c7e0}.small{font-size:18px;color:#7f91ad}
+</style></head><body><div class="box"><div class="logo">VäV</div><p>Startar skärmen...</p><div class="small">Väntar på pairing/OTA</div></div></body></html>
+HTML
+
+VIEW_URL="file://$BOOT_HTML"
+
 if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
 fi
 
 if [ -z "${VIEW_URL:-}" ]; then
-  VIEW_URL="about:blank"
+  if [ -f "$PAIRING_HTML" ]; then
+    VIEW_URL="file://$PAIRING_HTML"
+  else
+    VIEW_URL="file://$BOOT_HTML"
+  fi
 fi
 
 pkill chromium >/dev/null 2>&1 || true
