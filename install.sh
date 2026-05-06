@@ -1,151 +1,85 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
 APP_DIR="/home/pi/tavla"
-REPO_RAW_BASE="${REPO_RAW_BASE:-https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main}"
-SERVER_BASE_URL="${SERVER_BASE_URL:-https://status.vantrum.se}"
 
-echo "========================================"
-echo " VäV Pi Client - ren installation v4"
-echo "========================================"
+echo "====================================="
+echo " VäV Pi Client v5"
+echo " Stabil kiosk-start för Pi OS 13"
+echo "====================================="
 
-if [ "$(id -u)" -ne 0 ]; then
-  echo "Kör med sudo:"
-  echo "curl -fsSL $REPO_RAW_BASE/install.sh | sudo bash"
-  exit 1
-fi
+sudo apt update
 
-PI_USER="${SUDO_USER:-pi}"
-PI_HOME="$(getent passwd "$PI_USER" | cut -d: -f6 || true)"
-[ -z "$PI_HOME" ] && PI_USER="pi" && PI_HOME="/home/pi"
+sudo apt install -y \
+  chromium \
+  openbox \
+  unclutter \
+  xserver-xorg \
+  x11-xserver-utils \
+  xinit \
+  curl \
+  python3 \
+  python3-requests \
+  raspi-utils-core \
+  raspi-utils-dt
 
-export DEBIAN_FRONTEND=noninteractive
+mkdir -p $APP_DIR
 
-echo "1/7 Stoppar gamla tjänster..."
-systemctl stop vav-kiosk.service vav-ota-client.service vav-command-client.service status-kiosk.service >/dev/null 2>&1 || true
-systemctl disable status-kiosk.service >/dev/null 2>&1 || true
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/start_kiosk.sh -o $APP_DIR/start_kiosk.sh
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/ota_client.py -o $APP_DIR/ota_client.py
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/command_client.py -o $APP_DIR/command_client.py
 
-echo "2/7 Installerar paket..."
-apt-get update -y
-apt-get install -y curl git python3 python3-requests xserver-xorg xinit x11-xserver-utils openbox unclutter cec-utils libraspberrypi-bin || true
-if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
-  apt-get install -y chromium || apt-get install -y chromium-browser
-fi
+chmod +x $APP_DIR/start_kiosk.sh
 
-echo "3/7 Skapar katalog..."
-mkdir -p "$APP_DIR"
-
-download_or_copy() {
-  local name="$1"
-  if [ -f "./$name" ]; then
-    cp "./$name" "$APP_DIR/$name"
-  else
-    curl -fsSL "$REPO_RAW_BASE/$name" -o "$APP_DIR/$name"
-  fi
-}
-
-echo "4/7 Hämtar klientfiler..."
-download_or_copy "ota_client.py"
-download_or_copy "start_kiosk.sh"
-download_or_copy "command_client.py"
-chmod +x "$APP_DIR/start_kiosk.sh" "$APP_DIR/ota_client.py" "$APP_DIR/command_client.py" || true
-
-if [ ! -f "$APP_DIR/status_kiosk.env" ]; then
-cat > "$APP_DIR/status_kiosk.env" <<ENV
-SERVER_BASE_URL=$SERVER_BASE_URL
+cat > $APP_DIR/status_kiosk.env <<ENV
+SERVER_BASE_URL=https://status.vantrum.se
 OTA_INTERVAL=15
 DEVICE_ID=
 DEVICE_TOKEN=
 VIEW_URL=
 PAIRING_CODE=
 ENV
-fi
-chown -R "$PI_USER:$PI_USER" "$APP_DIR"
 
-echo "5/7 Sätter X-rättigheter..."
-cat > /etc/X11/Xwrapper.config <<XWRAP
-allowed_users=anybody
-needs_root_rights=yes
-XWRAP
-rm -f /tmp/.X0-lock >/dev/null 2>&1 || true
-rm -rf /tmp/.X11-unix/X0 >/dev/null 2>&1 || true
+mkdir -p /home/pi/.config/openbox
 
-echo "6/7 Skapar systemd-tjänster..."
+cat > /home/pi/.config/openbox/autostart <<AUTO
+xset s off
+xset -dpms
+xset s noblank
+unclutter -idle 0 &
+/home/pi/tavla/start_kiosk.sh &
+AUTO
+
 cat > /etc/systemd/system/vav-ota-client.service <<SERVICE
 [Unit]
-Description=VäV OTA och pairing-klient
+Description=VäV OTA Client
 After=network-online.target
-Wants=network-online.target
 
 [Service]
-Type=simple
-User=$PI_USER
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/python3 $APP_DIR/ota_client.py
+User=pi
+WorkingDirectory=/home/pi/tavla
+ExecStart=/usr/bin/python3 /home/pi/tavla/ota_client.py
 Restart=always
-RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 SERVICE
 
-cat > /etc/systemd/system/vav-command-client.service <<SERVICE
-[Unit]
-Description=VäV command client
-After=network-online.target
-Wants=network-online.target
+sudo systemctl daemon-reload
+sudo systemctl enable vav-ota-client.service
+sudo systemctl restart vav-ota-client.service
 
-[Service]
-Type=simple
-User=$PI_USER
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/python3 $APP_DIR/command_client.py
-Restart=always
-RestartSec=10
+sudo raspi-config nonint do_boot_behaviour B4
 
-[Install]
-WantedBy=multi-user.target
-SERVICE
+if ! grep -q "openbox-session" /home/pi/.bash_profile 2>/dev/null; then
+cat >> /home/pi/.bash_profile <<BASH
 
-cat > /etc/systemd/system/vav-kiosk.service <<SERVICE
-[Unit]
-Description=VäV Chromium kiosk
-After=network-online.target vav-ota-client.service
-Wants=network-online.target
-Conflicts=getty@tty1.service
+if [ -z "\$DISPLAY" ] && [ "\$(tty)" = "/dev/tty1" ]; then
+  startx /usr/bin/openbox-session -- :0
+fi
+BASH
+fi
 
-[Service]
-Type=simple
-User=$PI_USER
-Group=$PI_USER
-WorkingDirectory=$APP_DIR
-Environment=HOME=$PI_HOME
-Environment=XAUTHORITY=$PI_HOME/.Xauthority
-Environment=DISPLAY=:0
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
-ExecStartPre=/bin/bash -lc 'rm -f /tmp/.X0-lock; rm -rf /tmp/.X11-unix/X0; pkill -f "Xorg.*:0" || true; pkill chromium || true; pkill chromium-browser || true'
-ExecStart=/bin/bash -lc 'cd /home/pi/tavla && exec startx /home/pi/tavla/start_kiosk.sh -- :0 vt1 -keeptty -nocursor -s 0 -dpms'
-Restart=always
-RestartSec=7
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-echo "7/7 Aktiverar och startar..."
-systemctl daemon-reload
-systemctl disable getty@tty1.service >/dev/null 2>&1 || true
-systemctl enable vav-ota-client.service vav-command-client.service vav-kiosk.service
-raspi-config nonint do_boot_behaviour B2 >/dev/null 2>&1 || true
-systemctl set-default multi-user.target >/dev/null 2>&1 || true
-systemctl restart vav-ota-client.service
-sleep 5
-systemctl restart vav-command-client.service
-systemctl restart vav-kiosk.service
-
-echo "KLART v4 - Pi ska visa VäV start/pairing-skärm."
+echo "KLART"
+echo "Starta om Pi:"
+echo "sudo reboot"

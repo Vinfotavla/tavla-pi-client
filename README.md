@@ -1,9 +1,9 @@
-# VäV Tavla Pi Client v4
+# VäV Pi Client v5
 
-Kör:
+Kör på Pi:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | sudo bash
-```
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | bash
 
-v4 fixar svart skärm med markör genom lokal startskärm.
+Sedan:
+
+sudo reboot
