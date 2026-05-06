@@ -1,9 +1,9 @@
-# VäV Pi Client v5
+# VäV Pi Client lightdm v6
 
 Kör på Pi:
 
-curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | bash
+```bash
+curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | sudo bash
+```
 
-Sedan:
-
-sudo reboot
+Denna version använder LightDM autologin + Openbox + Chromium.
