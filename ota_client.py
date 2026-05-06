@@ -13,7 +13,7 @@ ENV_FILE = APP_DIR / "status_kiosk.env"
 PAIRING_HTML = APP_DIR / "pairing.html"
 VERSION_FILE = APP_DIR / "version.txt"
 
-CLIENT_VERSION = "2.0-pairing-clean"
+CLIENT_VERSION = "3.0-pairing-clean"
 
 def log(*args):
     print("[VäV OTA]", *args, flush=True)

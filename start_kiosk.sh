@@ -7,6 +7,9 @@ ENV_FILE="$APP_DIR/status_kiosk.env"
 export DISPLAY=:0
 export XAUTHORITY="${XAUTHORITY:-/home/pi/.Xauthority}"
 
+# openbox ger Chromium en fungerande window manager i X-sessionen
+openbox >/dev/null 2>&1 &
+
 xset s off || true
 xset -dpms || true
 xset s noblank || true
@@ -45,6 +48,8 @@ exec "$BROWSER" \
   --disable-session-crashed-bubble \
   --disable-translate \
   --disable-features=TranslateUI \
+  --disable-dev-shm-usage \
   --no-first-run \
+  --noerrdialogs \
   --autoplay-policy=no-user-gesture-required \
   "$VIEW_URL"
