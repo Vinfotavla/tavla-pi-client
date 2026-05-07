@@ -1,4 +1,4 @@
-# VäV Pi Client lightdm v6
+# VäV Pi Client lightdm v7
 
 Kör på Pi:
 
@@ -6,4 +6,8 @@ Kör på Pi:
 curl -fsSL https://raw.githubusercontent.com/Vinfotavla/tavla-pi-client/main/install.sh | sudo bash
 ```
 
-Denna version använder LightDM autologin + Openbox + Chromium.
+v7:
+- visar pairing-kod automatiskt
+- när skärmen kopplas i superadmin skrivs VIEW_URL
+- Chromium startas om automatiskt och visar tavlan
+- loggar till `/home/pi/tavla/vav.log`
